@@ -9,8 +9,8 @@ import chainlit as cl
 DB_FAISS_PATH = 'vectorstore'
 
 # Updated prompt template for legal assistant
-custom_prompt_template = """You are a legal assistant. Provide helpful answers to law-based questions. 
-If the question is not legal, just say 'Ask law-based questions'.
+custom_prompt_template = """You are a legal assistant. Provide helpful answers to law-based questions based on the context provided below.
+If the information needed to answer is not in the context, just say 'I don't have enough information from the data to answer your question'.
 
 Context: {context}
 Question: {question}
@@ -31,7 +31,7 @@ def set_custom_prompt():
 def retrieval_qa_chain(llm, prompt, db):
     qa_chain = RetrievalQA.from_chain_type(llm=llm,
                                            chain_type='stuff',
-                                           retriever=db.as_retriever(search_kwargs={'k': 2}),
+                                           retriever=db.as_retriever(search_kwargs={'k': 2}),  # Retrieves top 2 relevant chunks
                                            return_source_documents=False,  # Not returning the source docs
                                            chain_type_kwargs={'prompt': prompt}
                                            )
@@ -66,9 +66,9 @@ def final_result(query):
     # Ensure the answer is clean and displayed only once
     final_answer = response['result'].strip()
 
-    # Handling duplicates or multiple responses for non-legal questions
-    if final_answer.count('Ask law-based questions') > 0:
-        final_answer = 'Ask law-based questions'
+    # Handling cases where no relevant context is found
+    if "I don't have enough information from the data" in final_answer:
+        final_answer = "I don't have enough information from the data to answer your question."
 
     return final_answer
 
@@ -95,11 +95,10 @@ async def main(message: cl.Message):
     answer = res["result"].strip()
 
     # Ensure the answer is clean and displayed only once
-    if answer == 'Ask law-based questions':
-        await cl.Message(content='Ask law-based questions').send()
+    if answer == "I don't have enough information from the data to answer your question.":
+        await cl.Message(content=answer).send()
     else:
         await cl.Message(content=answer).send()
-
 
 # @cl.on_message
 # async def main(message: cl.Message):
